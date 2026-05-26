@@ -1,0 +1,17 @@
+FROM ghcr.io/cirruslabs/flutter:latest AS build
+WORKDIR /app
+
+# Allow passing the API base URL at build time
+ARG API_BASE_URL=''
+ENV API_BASE_URL=${API_BASE_URL}
+
+COPY . .
+RUN flutter config --no-analytics && flutter pub get
+# Pass API_BASE_URL to the Dart compiler so the app uses the correct backend
+RUN flutter build web --release --dart-define=API_BASE_URL=${API_BASE_URL}
+
+FROM nginx:alpine
+COPY --from=build /app/build/web /usr/share/nginx/html
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

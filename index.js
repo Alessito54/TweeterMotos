@@ -360,6 +360,31 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'API is running' });
 });
 
+// Root: página informativa simple para cuando no hay frontend desplegado
+app.get('/', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Tweeter Motos - API</title>
+        <style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;padding:24px;color:#222}a{color:#0b5fff}</style>
+      </head>
+      <body>
+        <h1>Tweeter Motos</h1>
+        <p>Esta URL corresponde al servidor backend. Si esperabas ver la aplicación web, despliega el frontend o configura un servicio estático.</p>
+        <ul>
+          <li><a href="/api/health">Comprobar estado de la API</a></li>
+          <li><a href="/api/tweets">Listar tweets (API)</a></li>
+        </ul>
+        <p>Si quieres que la raíz sirva la app web, puedo ayudarte a desplegar el frontend en Render o a servir los archivos estáticos desde aquí.</p>
+      </body>
+    </html>
+  `);
+});
+
 // Sincronizar BD e iniciar servidor
 db.sequelize.sync().then(async () => {
   await seedAdminUser();

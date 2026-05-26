@@ -5,6 +5,7 @@
 *.swp
 .env
 .env.*
+ca.pem
 server.log
 .DS_Store
 .atom/

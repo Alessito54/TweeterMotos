@@ -19,6 +19,13 @@ class MotosTweeterApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Route<dynamic> buildRoute(RouteSettings settings, Widget child) {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => child,
+      );
+    }
+
     return MaterialApp(
       title: 'Moto Tweeter',
       debugShowCheckedModeBanner: false,
@@ -64,9 +71,32 @@ class MotosTweeterApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       ),
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
+      onGenerateRoute: (settings) {
+        final isLoggedIn = authService.isAuthenticated();
+
+        switch (settings.name) {
+          case '/home':
+            if (!isLoggedIn) {
+              return buildRoute(
+                const RouteSettings(name: '/login'),
+                const LoginScreen(),
+              );
+            }
+            return buildRoute(settings, const HomeScreen());
+          case '/login':
+          case '/':
+          default:
+            if (isLoggedIn && settings.name != '/login') {
+              return buildRoute(
+                const RouteSettings(name: '/home'),
+                const HomeScreen(),
+              );
+            }
+            return buildRoute(
+              const RouteSettings(name: '/login'),
+              const LoginScreen(),
+            );
+        }
       },
       home: authService.isAuthenticated()
           ? const HomeScreen()
