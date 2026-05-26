@@ -3,6 +3,9 @@
 *.log
 *.pyc
 *.swp
+.env
+.env.*
+server.log
 .DS_Store
 .atom/
 .build/
@@ -17,6 +20,12 @@ migrate_working_dir/
 *.ipr
 *.iws
 .idea/
+
+# Local editor settings
+.vscode/
+
+# Node.js backend dependencies
+node_modules/
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line

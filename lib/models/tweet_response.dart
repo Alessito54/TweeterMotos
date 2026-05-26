@@ -1,6 +1,6 @@
 import 'tweet.dart';
 
-/// Model for the paginated response from the tweets API endpoint
+/// Model for the tweets API endpoint.
 class TweetResponse {
   final List<Tweet> content;
 
@@ -8,9 +8,8 @@ class TweetResponse {
     required this.content,
   });
 
-  /// Convert JSON to TweetResponse object
   factory TweetResponse.fromJson(Map<String, dynamic> json) {
-    final contentList = json['content'] as List<dynamic>? ?? [];
+    final contentList = (json['tweets'] ?? json['content']) as List<dynamic>? ?? [];
     return TweetResponse(
       content: contentList
           .map((tweet) {
@@ -23,5 +22,5 @@ class TweetResponse {
 
   @override
   String toString() =>
-      'TweetResponse(content: ${content.length}, totalElements)';
+      'TweetResponse(content: ${content.length})';
 }
