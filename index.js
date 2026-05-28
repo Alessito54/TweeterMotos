@@ -149,8 +149,29 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/tweets', async (req, res) => {
   try {
     const tweets = await db.Tweet.findAll({
-      order: [['createdAt', 'DESC']],
-      raw: true
+      include: [
+        {
+          model: db.Reaction,
+          attributes: ['id', 'emoji', 'userId', 'createdAt'],
+          include: [
+            {
+              model: db.User,
+              attributes: ['id', 'username']
+            }
+          ]
+        },
+        {
+          model: db.Reply,
+          attributes: ['id', 'text', 'userId', 'username', 'createdAt'],
+          include: [
+            {
+              model: db.User,
+              attributes: ['id', 'username']
+            }
+          ]
+        }
+      ],
+      order: [['createdAt', 'DESC']]
     });
     res.status(200).json({ tweets });
   } catch (error) {
@@ -221,6 +242,201 @@ app.delete('/api/tweets/:id', verifyToken, async (req, res) => {
 
     await tweet.destroy();
     res.status(200).json({ message: 'Tweet eliminado' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== REACTIONS ENDPOINTS ====================
+
+// GET /api/tweets/:id/reactions - Obtener reacciones de un tweet
+app.get('/api/tweets/:id/reactions', async (req, res) => {
+  try {
+    const reactions = await db.Reaction.findAll({
+      where: { tweetId: req.params.id },
+      include: [
+        {
+          model: db.User,
+          attributes: ['id', 'username']
+        }
+      ]
+    });
+    res.status(200).json({ reactions });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/tweets/:id/reactions - Agregar reacción a un tweet
+app.post('/api/tweets/:id/reactions', verifyToken, async (req, res) => {
+  try {
+    const { emoji } = req.body;
+
+    if (!emoji) {
+      return res.status(400).json({ error: 'El emoji es requerido' });
+    }
+
+    const tweet = await db.Tweet.findByPk(req.params.id);
+    if (!tweet) {
+      return res.status(404).json({ error: 'Tweet no encontrado' });
+    }
+
+    // Verificar si el usuario ya reaccionó a este tweet
+    const existingReaction = await db.Reaction.findOne({
+      where: {
+        tweetId: req.params.id,
+        userId: req.userId
+      }
+    });
+
+    if (existingReaction) {
+      // Si el emoji es el mismo, eliminar (toggle)
+      if (existingReaction.emoji === emoji) {
+        await existingReaction.destroy();
+        
+        // Retornar TODAS las reacciones actualizadas
+        const allReactions = await db.Reaction.findAll({
+          where: { tweetId: req.params.id },
+          include: [{ model: db.User, attributes: ['id', 'username'] }]
+        });
+        
+        return res.status(200).json({ 
+          message: 'Reacción eliminada', 
+          reactions: allReactions
+        });
+      } else {
+        // Si es diferente, actualizar el emoji
+        existingReaction.emoji = emoji;
+        await existingReaction.save();
+      }
+    } else {
+      // Crear nueva reacción
+      await db.Reaction.create({
+        emoji,
+        tweetId: req.params.id,
+        userId: req.userId
+      });
+    }
+
+    // Retornar TODAS las reacciones actualizadas
+    const allReactions = await db.Reaction.findAll({
+      where: { tweetId: req.params.id },
+      include: [{ model: db.User, attributes: ['id', 'username'] }]
+    });
+
+    res.status(201).json({ 
+      message: 'Reacción guardada', 
+      reactions: allReactions 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/reactions/:id - Eliminar reacción
+app.delete('/api/reactions/:id', verifyToken, async (req, res) => {
+  try {
+    const reaction = await db.Reaction.findByPk(req.params.id);
+
+    if (!reaction) {
+      return res.status(404).json({ error: 'Reacción no encontrada' });
+    }
+
+    if (reaction.userId !== req.userId) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar esta reacción' });
+    }
+
+    await reaction.destroy();
+    res.status(200).json({ message: 'Reacción eliminada' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== REPLIES ENDPOINTS ====================
+
+// GET /api/tweets/:id/replies - Obtener respuestas de un tweet
+app.get('/api/tweets/:id/replies', async (req, res) => {
+  try {
+    const replies = await db.Reply.findAll({
+      where: { tweetId: req.params.id },
+      include: [
+        {
+          model: db.User,
+          attributes: ['id', 'username']
+        }
+      ],
+      order: [['createdAt', 'ASC']]
+    });
+    res.status(200).json({ replies });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/tweets/:id/replies - Crear respuesta a un tweet
+app.post('/api/tweets/:id/replies', verifyToken, async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text) {
+      return res.status(400).json({ error: 'El texto de la respuesta es requerido' });
+    }
+
+    const tweet = await db.Tweet.findByPk(req.params.id);
+    if (!tweet) {
+      return res.status(404).json({ error: 'Tweet no encontrado' });
+    }
+
+    const user = await db.User.findByPk(req.userId);
+
+    const reply = await db.Reply.create({
+      text,
+      tweetId: req.params.id,
+      userId: req.userId,
+      username: user.username
+    });
+
+    const replyWithUser = await db.Reply.findByPk(reply.id, {
+      include: [
+        {
+          model: db.User,
+          attributes: ['id', 'username']
+        }
+      ]
+    });
+
+    res.status(201).json(replyWithUser);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/replies/:id - Eliminar respuesta
+app.delete('/api/replies/:id', verifyToken, async (req, res) => {
+  try {
+    const reply = await db.Reply.findByPk(req.params.id);
+
+    if (!reply) {
+      return res.status(404).json({ error: 'Respuesta no encontrada' });
+    }
+
+    const currentUser = await db.User.findByPk(req.userId);
+    const isAdmin = currentUser && currentUser.username === 'admin';
+
+    // Solo el autor o admin pueden eliminar
+    if (reply.userId !== req.userId && !isAdmin) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar esta respuesta' });
+    }
+
+    await reply.destroy();
+    res.status(200).json({ message: 'Respuesta eliminada' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });

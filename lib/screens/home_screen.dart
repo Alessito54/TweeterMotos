@@ -4,8 +4,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/tweet.dart';
+import '../models/reaction.dart';
+import '../models/reply.dart';
 import '../services/auth_service.dart';
 import '../services/tweet_service.dart';
+import '../widgets/reactions_widget.dart';
+import '../widgets/replies_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _motoCilindradaController = TextEditingController();
 
   List<Tweet> _tweets = [];
+  Map<int, List<Reaction>> _tweetReactions = {};
+  Map<int, List<Reply>> _tweetReplies = {};
   bool _isLoading = false;
   bool _isCreating = false;
   Uint8List? _selectedImageBytes;
@@ -50,6 +56,38 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _tweets = tweets;
         });
+        // Load reactions and replies for each tweet
+        _tweetReactions.clear();
+        _tweetReplies.clear();
+        
+        for (var tweet in tweets) {
+          if (tweet.id != null) {
+            // Extract reactions and replies from tweet if included
+            if (tweet.reactions != null && tweet.reactions!.isNotEmpty) {
+              _tweetReactions[tweet.id!] = tweet.reactions!
+                  .map((r) => r is Reaction 
+                    ? r 
+                    : Reaction.fromJson(r as Map<String, dynamic>))
+                  .toList();
+            } else {
+              _tweetReactions[tweet.id!] = [];
+            }
+            
+            if (tweet.replies != null && tweet.replies!.isNotEmpty) {
+              _tweetReplies[tweet.id!] = tweet.replies!
+                  .map((r) => r is Reply 
+                    ? r 
+                    : Reply.fromJson(r as Map<String, dynamic>))
+                  .toList();
+            } else {
+              _tweetReplies[tweet.id!] = [];
+            }
+          }
+        }
+        
+        if (mounted) {
+          setState(() {});
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -63,6 +101,22 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _loadReactionsAndReplies(int tweetId) async {
+    try {
+      final reactions = await _tweetService.getReactions(tweetId);
+      final replies = await _tweetService.getReplies(tweetId);
+
+      if (mounted) {
+        setState(() {
+          _tweetReactions[tweetId] = reactions;
+          _tweetReplies[tweetId] = replies;
+        });
+      }
+    } catch (e) {
+      print('Error loading reactions/replies for tweet $tweetId: $e');
     }
   }
 
@@ -485,6 +539,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             separatorBuilder: (_, __) => const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final tweet = _tweets[index];
+                              final reactions = _tweetReactions[tweet.id] ?? [];
+                              final replies = _tweetReplies[tweet.id] ?? [];
+
                               return Card(
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
@@ -595,6 +652,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                       ],
+                                      // Reactions Widget
+                                      ReactionsWidget(
+                                        tweetId: tweet.id!,
+                                        reactions: reactions,
+                                        currentUserId: currentUserId!,
+                                        onReactionAdded: () => _loadReactionsAndReplies(tweet.id!),
+                                        onReactionRemoved: () => _loadReactionsAndReplies(tweet.id!),
+                                      ),
+                                      // Replies Widget
+                                      RepliesWidget(
+                                        tweetId: tweet.id!,
+                                        replies: replies,
+                                        currentUserId: currentUserId!,
+                                        onReplyAdded: () => _loadReactionsAndReplies(tweet.id!),
+                                        onReplyRemoved: () => _loadReactionsAndReplies(tweet.id!),
+                                      ),
                                     ],
                                   ),
                                 ),

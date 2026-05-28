@@ -48,6 +48,8 @@ module.exports = (sequelize, DataTypes) => {
 
   Tweet.associate = (models) => {
     Tweet.belongsTo(models.User, { foreignKey: 'userId' });
+    Tweet.hasMany(models.Reaction, { foreignKey: 'tweetId', onDelete: 'CASCADE' });
+    Tweet.hasMany(models.Reply, { foreignKey: 'tweetId', onDelete: 'CASCADE' });
   };
 
   return Tweet;

@@ -8,6 +8,8 @@ class Tweet {
   final int? motoCilindrada;
   final int? userId;
   final String? createdAt;
+  final List<dynamic>? reactions;
+  final List<dynamic>? replies;
 
   Tweet({
     this.id,
@@ -19,6 +21,8 @@ class Tweet {
     this.motoCilindrada,
     this.userId,
     this.createdAt,
+    this.reactions,
+    this.replies,
   });
 
   factory Tweet.fromJson(Map<String, dynamic> json) {
@@ -36,6 +40,8 @@ class Tweet {
       motoCilindrada: rawCil is int ? rawCil : int.tryParse(rawCil?.toString() ?? ''),
       userId: rawUserId is int ? rawUserId : int.tryParse(rawUserId?.toString() ?? ''),
       createdAt: json['createdAt']?.toString(),
+      reactions: json['Reactions'] as List<dynamic>? ?? [],
+      replies: json['Replies'] as List<dynamic>? ?? [],
     );
   }
 
@@ -50,6 +56,8 @@ class Tweet {
       'motoCilindrada': motoCilindrada,
       'userId': userId,
       'createdAt': createdAt,
+      'reactions': reactions,
+      'replies': replies,
     };
   }
 

@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 
 import '../models/tweet.dart';
 import '../models/tweet_response.dart';
+import '../models/reaction.dart';
+import '../models/reply.dart';
 import '../repositories/tweet_repository.dart';
 import 'auth_service.dart';
 
@@ -31,14 +33,15 @@ class TweetService implements ITweetRepository {
     if (envUrl.isNotEmpty) return envUrl;
 
     if (kIsWeb) {
-      return 'http://localhost:3000/api';
+      // En web, usar 127.0.0.1 en lugar de localhost para mayor compatibilidad
+      return 'http://127.0.0.1:3000/api';
     }
 
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return 'http://10.0.2.2:3000/api';
       default:
-        return 'http://localhost:3000/api';
+        return 'http://127.0.0.1:3000/api';
     }
   }
 
@@ -157,6 +160,111 @@ class TweetService implements ITweetRepository {
     if (response.statusCode != 204 && response.statusCode != 200) {
       throw Exception('Failed to delete tweet. Status code: ${response.statusCode}');
     }
+  }
+
+  @override
+  Future<Reaction> addReaction(int tweetId, String emoji) async {
+    await _ensureAuth();
+
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/tweets/$tweetId/reactions'),
+      headers: _getJsonHeaders(),
+      body: jsonEncode({'emoji': emoji}),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final reactionsJson = decoded['reactions'] as List<dynamic>? ?? [];
+      // Retornar la primera reacción, pero idealmente el frontend recargaría todas
+      if (reactionsJson.isNotEmpty) {
+        return Reaction.fromJson(Map<String, dynamic>.from(reactionsJson.first as Map));
+      }
+      // Si no hay reacciones, retornar una reacción vacía (se recargará en el UI)
+      return Reaction(emoji: '', tweetId: tweetId, userId: -1);
+    }
+
+    throw Exception('Failed to add reaction. Status: ${response.statusCode}. Message: ${response.body}');
+  }
+
+  @override
+  Future<void> removeReaction(int reactionId) async {
+    await _ensureAuth();
+
+    final response = await _httpClient.delete(
+      Uri.parse('$_baseUrl/reactions/$reactionId'),
+      headers: _getJsonHeaders(),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to remove reaction. Status: ${response.statusCode}');
+    }
+  }
+
+  @override
+  Future<List<Reaction>> getReactions(int tweetId) async {
+    await _ensureAuth();
+
+    final response = await _httpClient.get(
+      Uri.parse('$_baseUrl/tweets/$tweetId/reactions'),
+      headers: _getJsonHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final reactions = decoded['reactions'] as List<dynamic>? ?? [];
+      return reactions.map((r) => Reaction.fromJson(Map<String, dynamic>.from(r as Map))).toList();
+    }
+
+    throw Exception('Failed to load reactions. Status code: ${response.statusCode}');
+  }
+
+  @override
+  Future<Reply> addReply(int tweetId, String text) async {
+    await _ensureAuth();
+
+    final response = await _httpClient.post(
+      Uri.parse('$_baseUrl/tweets/$tweetId/replies'),
+      headers: _getJsonHeaders(),
+      body: jsonEncode({'text': text}),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return Reply.fromJson(Map<String, dynamic>.from(jsonDecode(response.body) as Map));
+    }
+
+    throw Exception('Failed to create reply. Status: ${response.statusCode}. Message: ${response.body}');
+  }
+
+  @override
+  Future<void> removeReply(int replyId) async {
+    await _ensureAuth();
+
+    final response = await _httpClient.delete(
+      Uri.parse('$_baseUrl/replies/$replyId'),
+      headers: _getJsonHeaders(),
+    );
+
+    if (response.statusCode != 200 && response.statusCode != 204) {
+      throw Exception('Failed to delete reply. Status: ${response.statusCode}');
+    }
+  }
+
+  @override
+  Future<List<Reply>> getReplies(int tweetId) async {
+    await _ensureAuth();
+
+    final response = await _httpClient.get(
+      Uri.parse('$_baseUrl/tweets/$tweetId/replies'),
+      headers: _getJsonHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final replies = decoded['replies'] as List<dynamic>? ?? [];
+      return replies.map((r) => Reply.fromJson(Map<String, dynamic>.from(r as Map))).toList();
+    }
+
+    throw Exception('Failed to load replies. Status code: ${response.statusCode}');
   }
 
   @override
